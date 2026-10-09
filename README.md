@@ -45,20 +45,101 @@ The best possible episode is +10: Left, then bounce Up/Down between the two chee
 
 ## Cheat sheet
 
-| Idea | Formula |
-|---|---|
-| Return | \(G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots = R_{t+1} + \gamma G_{t+1}\) |
-| State value | \(V_\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s]\) |
-| State-action value | \(Q_\pi(s,a) = \mathbb{E}_\pi[G_t \mid S_t = s, A_t = a]\) |
-| V from Q | \(V(s) = \sum_a \pi(a \mid s)\, Q(s,a)\) |
-| Q from V (needs the model) | \(Q(s,a) = \sum_{s',r} p(s',r \mid s,a)\,[r + \gamma V(s')]\) |
-| MC update | \(V(S_t) \leftarrow V(S_t) + \alpha\,[G_t - V(S_t)]\) |
-| TD(0) update | \(V(S_t) \leftarrow V(S_t) + \alpha\,[R_{t+1} + \gamma V(S_{t+1}) - V(S_t)]\) |
-| SARSA | \(Q(S_t,A_t) \leftarrow Q + \alpha\,[R_{t+1} + \gamma Q(S_{t+1},A_{t+1}) - Q]\) |
-| Q-learning | \(Q(S_t,A_t) \leftarrow Q + \alpha\,[R_{t+1} + \gamma \max_a Q(S_{t+1},a) - Q]\) |
+### Returns and values
 
-If the step **terminated**, the bootstrap term (\(\gamma V(S_{t+1})\) or \(\gamma Q(\cdot)\)) is 0.
-If it was only **truncated** (time limit), you still bootstrap.
+**Return** (total discounted reward from time $t$):
+
+$$
+G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+$$
+
+**Recursive form** (used for the backward pass in Task 2, and the seed of TD):
+
+$$
+G_t = R_{t+1} + \gamma\, G_{t+1}
+$$
+
+**State value** and **state-action value** under a policy $\pi$:
+
+$$
+V_\pi(s) = \mathbb{E}_\pi\left[\, G_t \mid S_t = s \,\right]
+\qquad\qquad
+Q_\pi(s,a) = \mathbb{E}_\pi\left[\, G_t \mid S_t = s,\ A_t = a \,\right]
+$$
+
+### How V and Q relate (Task 4)
+
+**V from Q** (average over what the policy would do):
+
+$$
+V(s) = \sum_{a} \pi(a \mid s)\, Q(s,a)
+$$
+
+**Q from V** (one-step lookahead; needs the model $p$):
+
+$$
+Q(s,a) = \sum_{s',\,r} p(s', r \mid s, a)\, \big[\, r + \gamma\, V(s') \,\big]
+$$
+
+### Prediction: learning $V$ (Tasks 5 and 6)
+
+**Monte Carlo**: wait for the episode to end, then move toward the real return:
+
+$$
+V(S_t) \leftarrow V(S_t) + \alpha \big[\, G_t - V(S_t) \,\big]
+$$
+
+**TD(0)**: after one step, move toward an estimated return:
+
+$$
+V(S_t) \leftarrow V(S_t) + \alpha \big[\, \underbrace{R_{t+1} + \gamma\, V(S_{t+1})}_{\text{TD target}} - V(S_t) \,\big]
+$$
+
+$$
+\delta_t = R_{t+1} + \gamma\, V(S_{t+1}) - V(S_t) \qquad \text{(TD error)}
+$$
+
+### Control: learning $Q$ (Tasks 7 to 9)
+
+**Monte Carlo control**:
+
+$$
+Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha \big[\, G_t - Q(S_t, A_t) \,\big]
+$$
+
+**SARSA** (on-policy: uses the next action $A_{t+1}$ you actually take):
+
+$$
+Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha \big[\, R_{t+1} + \gamma\, Q(S_{t+1}, A_{t+1}) - Q(S_t, A_t) \,\big]
+$$
+
+**Q-learning** (off-policy: uses the best next action):
+
+$$
+Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha \big[\, R_{t+1} + \gamma \max_{a} Q(S_{t+1}, a) - Q(S_t, A_t) \,\big]
+$$
+
+**Epsilon-greedy policy** with $|\mathcal{A}| = 4$ actions:
+
+$$
+\pi(a \mid s) =
+\begin{cases}
+1 - \varepsilon + \dfrac{\varepsilon}{|\mathcal{A}|} & \text{if } a = \arg\max_{a'} Q(s, a') \\[6pt]
+\dfrac{\varepsilon}{|\mathcal{A}|} & \text{otherwise}
+\end{cases}
+$$
+
+(With ties, the $1 - \varepsilon$ share is split evenly among the tied best actions.)
+
+### Terminated vs truncated
+
+If the step **terminated** (the cat), there is no future, so drop the bootstrap term:
+
+$$
+\text{target} = R_{t+1}
+$$
+
+If it was only **truncated** (time limit), the next state still has a future, so you still bootstrap with $\gamma V(S_{t+1})$ or $\gamma Q(S_{t+1}, \cdot)$.
 
 ## Tasks
 
@@ -76,7 +157,7 @@ Do them in order; later tasks import your earlier code. After each one, run `pyt
 | 8 | `t8_sarsa.py` | `sarsa_update`, `sarsa` | TD control, on-policy | `play.py control sarsa` |
 | 9 | `t9_q_learning.py` | `q_learning_update`, `q_learning` | off-policy TD control (the course's next unit) | `play.py control all` |
 
-The checker reproduces the course's numbers: \(G_0 = 3\), MC gives \(V(S_0)=0.3\), TD gives \(V(S_0)=0.1\).
+The checker reproduces the course's numbers: $G_0 = 3$, MC gives $V(S_0) = 0.3$, TD gives $V(S_0) = 0.1$.
 
 ## The simulator
 
@@ -119,8 +200,8 @@ Plots are saved to `plots/`.
 
 ## Bonus tasks
 
-- **n-step TD**: a target using the next n rewards, then bootstrap. n=1 is TD(0); n=∞ is MC.
-- **Expected SARSA**: target uses \(\sum_a \pi(a \mid s') Q(s',a)\) (your Task 4 `epsilon_greedy_probs`).
+- **n-step TD**: target $G_{t:t+n} = R_{t+1} + \gamma R_{t+2} + \dots + \gamma^{n-1} R_{t+n} + \gamma^n V(S_{t+n})$. $n = 1$ is TD(0); $n = \infty$ is MC.
+- **Expected SARSA**: target $R_{t+1} + \gamma \sum_a \pi(a \mid S_{t+1})\, Q(S_{t+1}, a)$ (your Task 4 `epsilon_greedy_probs`).
 - **Time-aware state**: make the state `(tile, steps_left)` and redo experiment 2.
 - **Consumable cheese**: cheese disappears once eaten. The state must now include which cheese remains.
 - **Iterative policy evaluation**: use `env.model` to compute V exactly with dynamic programming, and compare with MC/TD.
